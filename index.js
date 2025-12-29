@@ -6,94 +6,103 @@ import makeWASocket, {
 
 import axios from "axios"
 import P from "pino"
-import express from "express" // ⬅️ NEW: Used to run a simple web server
-import qrcode from "qrcode" // ⬅️ NEW: Used to convert the QR string into an image
+import express from "express"
+import qrcode from "qrcode"
 
-// 🔴 CHANGE THIS ONLY
+// 🔴 CHANGE ONLY THIS
 const WEBHOOK_URL = "https://amik06.app.n8n.cloud/webhook/whatsapp_baileys_only_2025"
-// 🔴 NEW: Set the port for the QR server
-const PORT = 3000
-const QR_SERVER_URL = `http://localhost:${PORT}`
 
-// Create a variable to hold the QR code string
-let qrCodeString = null 
+// ✅ Render-safe port
+const PORT = process.env.PORT || 3000
 
-// --- QR Code Server Setup ---
+let qrCodeString = null
+
+// ---------------- EXPRESS SERVER ----------------
 const app = express()
 
-// Route to display the QR code image
+app.get("/", (req, res) => {
+  res.send("WhatsApp bot is running")
+})
+
+app.get("/health", (req, res) => {
+  res.send("ok")
+})
+
 app.get("/qr", async (req, res) => {
-    if (qrCodeString) {
-        // Convert the QR code string to a data URL (PNG image)
-        const qrImage = await qrcode.toDataURL(qrCodeString, { scale: 10 })
-        
-        // Render a simple HTML page to display the image
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>WhatsApp Bot QR Code</title>
-                <style>body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }</style>
-            </head>
-            <body>
-                <h1>Scan This QR Code</h1>
-                <p>Open WhatsApp &gt; Linked Devices &gt; Link a Device</p>
-                <img src="${qrImage}" alt="QR Code">
-            </body>
-            </html>
-        `)
-    } else {
-        res.send("QR Code is not yet generated or the bot is already connected.")
-    }
+  if (!qrCodeString) {
+    return res.send("QR not generated yet or already connected.")
+  }
+
+  const qrImage = await qrcode.toDataURL(qrCodeString, { scale: 10 })
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>WhatsApp QR</title>
+      <style>
+        body { 
+          display: flex; 
+          flex-direction: column; 
+          align-items: center; 
+          justify-content: center; 
+          height: 100vh; 
+          font-family: Arial;
+        }
+      </style>
+    </head>
+    <body>
+      <h2>Scan WhatsApp QR</h2>
+      <img src="${qrImage}" />
+      <p>WhatsApp → Linked Devices → Link a Device</p>
+    </body>
+    </html>
+  `)
 })
 
 app.listen(PORT, () => {
-    console.log(`\n🌐 QR Server running at ${QR_SERVER_URL}`)
-    console.log("Waiting for WhatsApp connection...")
+  console.log("🌐 Server running on port", PORT)
 })
-// -----------------------------
+// ------------------------------------------------
 
 
+// ---------------- WHATSAPP BOT ------------------
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("auth")
-  const { version, isLatest } = await fetchLatestWaWebVersion()
-  console.log(`Using WA Web v${version.join('.')}, isLatest: ${isLatest}`)
+  const { version } = await fetchLatestWaWebVersion()
 
   const sock = makeWASocket({
     version,
     auth: state,
     logger: P({ level: "silent" }),
-    // ⬇️ NEW: Use the 'qr' connection option to receive the QR string
-    qrMethod: "qr" 
+    qrMethod: "qr"
   })
 
-  // ✅ AUTH SAVE
   sock.ev.on("creds.update", saveCreds)
 
-  // ✅ CONNECTION STATUS
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update
 
-    // 🌟 MANUAL QR CODE HANDLING 🌟
     if (qr) {
-        qrCodeString = qr // Save the QR code string to the global variable
-        console.log(`\n➡️ NEW QR CODE generated. Open this URL in your browser: ${QR_SERVER_URL}/qr\n`)
+      qrCodeString = qr
+      console.log("➡️ New QR generated. Open /qr on your Render app URL.")
     }
 
     if (connection === "open") {
-      console.log("✅ WhatsApp connected. You can close the browser page now.")
+      qrCodeString = null
+      console.log("✅ WhatsApp connected")
     }
 
     if (connection === "close") {
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-      
+
       console.log("❌ Connection closed. Reconnect:", shouldReconnect)
+
       if (shouldReconnect) startBot()
     }
   })
 
-  // ✅ MESSAGE LISTENER (no change)
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return
 
@@ -112,8 +121,6 @@ async function startBot() {
 
     if (!text) return
 
-    console.log(`📩 MESSAGE RECEIVED: ${from} -> ${text}`)
-
     try {
       const response = await axios.post(WEBHOOK_URL, {
         from,
@@ -126,17 +133,14 @@ async function startBot() {
           ? response.data
           : response.data?.reply
 
-      console.log("🧠 n8n reply:", reply)
-
       if (reply) {
         await sock.sendMessage(from, { text: reply })
-        console.log("✅ Reply sent to WhatsApp")
       }
     } catch (err) {
-      console.error("❌ Error sending to n8n:", err.message)
+      console.error("❌ n8n error:", err.message)
     }
   })
 }
 
-
 startBot()
+// ------------------------------------------------
