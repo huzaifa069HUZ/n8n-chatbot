@@ -10,7 +10,7 @@ import express from "express"
 import qrcode from "qrcode"
 
 // 🔴 CHANGE ONLY THIS
-const WEBHOOK_URL = "https://n8n-render-1-uw3n.onrender.com/webhook/whatsapp_baileys_only_2025"
+const WEBHOOK_URL = "https://amik06.app.n8n.cloud/webhook/whatsapp_baileys_only_2025"
 
 // ✅ Render-safe port
 const PORT = process.env.PORT || 3000
