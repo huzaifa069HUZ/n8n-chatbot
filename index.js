@@ -68,7 +68,7 @@ app.listen(PORT, () => {
 
 // ---------------- WHATSAPP BOT ------------------
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("authv2")
+  const { state, saveCreds } = await useMultiFileAuthState("authclient1")
   const { version } = await fetchLatestWaWebVersion()
 
   const sock = makeWASocket({
