@@ -10,7 +10,7 @@ import express from "express"
 import qrcode from "qrcode"
 
 // 🔴 CHANGE ONLY THIS
-const WEBHOOK_URL = "https://amik06.app.n8n.cloud/webhook/whatsapp_baileys_only_2025"
+const WEBHOOK_URL = "https://n8n-latest-yecs.onrender.com/webhook/whatsapp_baileys_only_2025"
 
 // ✅ Render-safe port
 const PORT = process.env.PORT || 3000
@@ -68,7 +68,7 @@ app.listen(PORT, () => {
 
 // ---------------- WHATSAPP BOT ------------------
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("auth")
+  const { state, saveCreds } = await useMultiFileAuthState("authv2")
   const { version } = await fetchLatestWaWebVersion()
 
   const sock = makeWASocket({
