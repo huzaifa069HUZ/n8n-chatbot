@@ -1,15 +1,16 @@
 import makeWASocket, {
   DisconnectReason,
-  useMultiFileAuthState,
+  // useMultiFileAuthState, // REMOVED: This causes daily logouts
   fetchLatestWaWebVersion
 } from "@whiskeysockets/baileys"
 
+import { usePostgreSQLAuthState } from "postgres-baileys" // ADDED: Required for database storage
 import axios from "axios"
 import P from "pino"
 import express from "express"
 import qrcode from "qrcode"
 
-// 🔴 CHANGE ONLY THIS
+// 🔴 Webhook URL for n8n
 const WEBHOOK_URL = "https://n8n-latest-yecs.onrender.com/webhook/whatsapp_baileys_only_2025"
 
 // ✅ Render-safe port
@@ -66,9 +67,24 @@ app.listen(PORT, () => {
 // ------------------------------------------------
 
 
+// ---------------- DATABASE CONFIG ----------------
+// 🔴 HARDCODED DATABASE DETAILS
+const dbConfig = {
+  host: "aws-1-ap-northeast-2.pooler.supabase.com", // YOUR HOST (Always use quotes)
+  port: 5432,                                     // Numbers do NOT need quotes
+  user: "postgres.uyjbtpgariajlwsjlheg",                               // REPLACE with your Supabase user
+  password: "huzaifa786ASHIKA",                 // REPLACE with your Supabase password
+  database: "postgres",                           // REPLACE with your Supabase DB name
+  ssl: { rejectUnauthorized: false }              // Required for Supabase/Render
+}
+// ------------------------------------------------
+
+
 // ---------------- WHATSAPP BOT ------------------
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("authclient1")
+  // CHANGED: Uses hardcoded Postgres config instead of a local folder
+  // "whatsapp-session-v1" is the unique ID for this session in your DB
+  const { state, saveCreds } = await usePostgreSQLAuthState(dbConfig, "whatsapp-session-v1")
   const { version } = await fetchLatestWaWebVersion()
 
   const sock = makeWASocket({
@@ -78,6 +94,7 @@ async function startBot() {
     qrMethod: "qr"
   })
 
+  // Saves login credentials to your Supabase database automatically
   sock.ev.on("creds.update", saveCreds)
 
   sock.ev.on("connection.update", (update) => {
